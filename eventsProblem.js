@@ -16,103 +16,60 @@
 // re-fetching not good because it gives data in different order next time
 // so I need to go like line by line without actually loading full data 
 // so I need to wait for chunk then proceed with another chunk up until I get the parent;
+//so should wait for us to read data line by line and chunk after chunck (no re fetch);
+
+const https = require("https");
+const readline = require("readline");
 
 const url = "https://public-r2.novabenefits.com/seq.ndjson";
 
-//so this function waits for us to read data line by line and chunk after chunck (no re fetch);
-async function streamNDJSON(url, onLine) {
-  const res = await fetch(url);
-  const decoder = new TextDecoder();
-  const reader = res.body.getReader();
+https.get(url, (res) => {
+  const rl = readline.createInterface({ input: res });
 
-  let buffer = "";
+  const offers = new Map();
+  const orderOffers = new Map();
+  const parents = new Map();
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    let lines = buffer.split('\n');
-
-    buffer = lines.pop();
-    for (let line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const obj = JSON.parse(line);
-        await onLine(obj);
-      } catch (e) {
-        console.error("Invalid JSON line:", line);
-      }
-    }
-  }
-
-  if (buffer.trim()) {
+  rl.on("line", (line) => {
+    let obj;
     try {
-      const obj = JSON.parse(buffer);
-      await onLine(obj);
+      obj = JSON.parse(line);
     } catch (e) {
-      console.error("Final line invalid:", buffer);
+      return;
     }
-  }
-}
 
-async function processOffersStream() {
-  const idToEvent = new Map();     
-  const orderToOffers = new Map(); 
+    if (obj.type === "order") {
+      orderOffers.set(obj.id, []);
+      if (offers.has(obj.id)) {
+        orderOffers.get(obj.id).push(...offers.get(obj.id));
+        offers.delete(obj.id);
+      }
+    } else if (obj.type === "offer") {
+      parents.set(obj.id, obj.parent);
 
-  const seenOfferIds = new Set();
-
-  function tryResolveChain(offer) {
-    const chain = [];
-
-    let current = offer;
-    while (current) {
-      if (current.type === 'order') {
-        const orderId = current.id;
-        if (!orderToOffers.has(orderId)) {
-          orderToOffers.set(orderId, []);
-        }
-
-        const offers = orderToOffers.get(orderId);
-        for (let i = chain.length - 1; i >= 0; i--) {
-          const offer = chain[i];
-          if (!seenOfferIds.has(offer.id)) {
-            offers.push(offer);
-            seenOfferIds.add(offer.id);
-          }
-          idToEvent.delete(offer.id);
-        }
-        idToEvent.delete(orderId);
-        break;
+      let root = obj.parent;
+      while (parents.has(root)) {
+        root = parents.get(root);
       }
 
-      if (current.type === 'offer') {
-        chain.push(current);
-        current = idToEvent.get(current.parent);
+      if (orderOffers.has(root)) {
+        orderOffers.get(root).push(obj.id);
       } else {
-        break;
+        if (!offers.has(root)) offers.set(root, []);
+        offers.get(root).push(obj.id);
       }
-    }
-  }
-
-  await streamNDJSON(url, async (event) => {
-    idToEvent.set(event.id, event);
-
-    if (event.type === 'offer') {
-      tryResolveChain(event);
     }
   });
 
-  for (let [orderId, offers] of orderToOffers.entries()) {
-    console.log(orderId, "=>", offers.map(o => o.id));
-  }
-}
+  rl.on("close", () => {
+    for (const [order, offerList] of orderOffers.entries()) {
+      console.log(order + " =>", offerList);
+    }
+  });
+});
 
-processOffersStream();
 
-
-
-// I took AI help to code this
+// I took full AI help to code this
 
 
 
