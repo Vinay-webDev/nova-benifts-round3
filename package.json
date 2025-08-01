@@ -1,0 +1,6 @@
+{
+  "author": "Vinay H C",
+  "dependencies": {
+    "stream-json": "^1.9.1"
+  }
+}

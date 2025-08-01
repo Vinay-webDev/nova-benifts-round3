@@ -20,6 +20,7 @@
 
 const https = require("https");
 const readline = require("readline");
+const fs = require("fs");
 
 const url = "https://public-r2.novabenefits.com/seq.ndjson";
 
@@ -62,20 +63,18 @@ https.get(url, (res) => {
   });
 
   rl.on("close", () => {
+    const result = {};
     for (const [order, offerList] of orderOffers.entries()) {
-      console.log(order + " =>", offerList);
+      result[order] = offerList;
     }
+    fs.writeFileSync("output.json", JSON.stringify(result, null, 2));
+    console.log("Done! Output saved to output.json");
   });
 });
 
 
-// I took full AI help to code this
 
-
-
-
-
-
+////////////////////////////////////////////////////////////////
 
 
 
