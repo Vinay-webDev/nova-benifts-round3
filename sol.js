@@ -2,12 +2,14 @@ const fs = require("fs");
 const { parser } = require("stream-json");
 const { streamValues } = require("stream-json/streamers/StreamValues");
 
+const stream1 = 'output.json';
+
 const key1 = "order_c9720673";
 const key2 = "order_56b86582";
 const key3 = "order_3cb1778c";
 
-const getOrderData = function (key) {const pipeline = fs
-  .createReadStream("output.json")
+const getOrderData = function (key, stream) {const pipeline = fs
+  .createReadStream(`${stream}`)
   .pipe(parser())
   .pipe(streamValues());
 
@@ -26,9 +28,9 @@ pipeline.on("end", () => {
 });}
 
 
-getOrderData(key1);
-getOrderData(key2);
-getOrderData(key3);
+getOrderData(key1, stream1);
+getOrderData(key2, stream1);
+getOrderData(key3, stream1);
 
 /* 
 //output//
